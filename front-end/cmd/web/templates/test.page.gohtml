@@ -1,36 +1,149 @@
 {{template "base" .}}
 
-{{define "content" }}
+{{define "content"}}
     <div class="container">
         <div class="row">
             <div class="col">
-                <h1 class="mt-5">Test microservices</h1>
+                <h1 class="mt-5">Microservices Tester</h1>
                 <hr>
-
-                <div id="output" class="mt-5" style="outline: 1px solid silver; padding: 2em;">
-                    <span class="text-muted">Output shows here...</span>
+                <button id="brokerBtn" class="btn btn-outline-primary">
+                    <span id="spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    Test Broker Service
+                </button>
+                <div id="output" class="mt-4 output-container">
+                    <span class="text-muted">Output will appear here...</span>
                 </div>
             </div>
         </div>
-        <div class="row">
-            <div class="col">
-                <h4 class="mt-5">Sent</h4>
-                <div class="mt-1" style="outline: 1px solid silver; padding: 2em;">
-                    <pre id="payload"><span class="text-muted">Nothing sent yet...</span></pre>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Request Sent</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre id="payload" class="mb-0"><span class="text-muted">No request sent yet...</span></pre>
+                    </div>
                 </div>
             </div>
-            <div class="col">
-                <h4 class="mt-5">Received</h4>
-                <div class="mt-1" style="outline: 1px solid silver; padding: 2em;">
-                    <pre id="received"><span class="text-muted">Nothing received yet...</span></pre>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Response Received</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre id="received" class="mb-0"><span class="text-muted">Waiting for response...</span></pre>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 {{end}}
 
+{{define "css"}}
+    <style>
+        .output-container {
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 1.5rem;
+            min-height: 120px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .alert {
+            transition: all 0.3s ease;
+        }
+    </style>
+{{end}}
+
 {{define "js"}}
     <script>
-        
+        document.addEventListener('DOMContentLoaded', () => {
+            const brokerBtn = document.getElementById("brokerBtn");
+            const spinner = document.getElementById("spinner");
+            const output = document.getElementById("output");
+            const sent = document.getElementById("payload");
+            const received = document.getElementById("received");
+
+            const clearOutputs = () => {
+                output.innerHTML = '<span class="text-muted">Output will appear here...</span>';
+                sent.innerHTML = '<span class="text-muted">No request sent yet...</span>';
+                received.innerHTML = '<span class="text-muted">Waiting for response...</span>';
+            };
+
+            const showAlert = (message, type = 'success') => {
+                const alert = document.createElement('div');
+                alert.className = `alert alert-${type} mt-3`;
+                alert.role = "alert";
+                alert.innerHTML = message;
+                output.appendChild(alert);
+
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 300);
+                }, 5000);
+            };
+
+            const testBrokerService = async () => {
+                try {
+                    // UI state updates
+                    brokerBtn.disabled = true;
+                    spinner.classList.remove('d-none');
+                    clearOutputs();
+
+                    // Prepare request data
+                    const requestData = {
+                        timestamp: new Date().toISOString(),
+                        endpoint: "/"
+                    };
+
+                    // Display request
+                    sent.textContent = JSON.stringify(requestData, null, 2);
+
+                    // Make API call
+                    const response = await fetch("/api/broker", {  // Updated endpoint
+                        method: "POST",
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            timestamp: new Date().toISOString(),
+                            endpoint: "/api/broker"  // Updated endpoint
+                        })
+                    });
+
+                    // Handle response
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        throw new Error(`Expected JSON but got: ${contentType || 'no content-type'}`);
+                    }
+
+                    const data = await response.json();
+                    received.textContent = JSON.stringify(data, null, 2);
+
+                    if (!response.ok || data.error) {
+                        throw new Error(data.message || `Request failed with status ${response.status}`);
+                    }
+
+                    showAlert(data.message || 'Request successful');
+
+                } catch (error) {
+                    console.error('API Error:', error);
+                    showAlert(`Error: ${error.message}`, 'danger');
+                    received.textContent = `Error: ${error.message}`;
+                } finally {
+                    brokerBtn.disabled = false;
+                    spinner.classList.add('d-none');
+                }
+            };
+
+            brokerBtn.addEventListener("click", testBrokerService);
+        });
     </script>
 {{end}}

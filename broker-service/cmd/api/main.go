@@ -2,27 +2,25 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
+
+	"../broker-service/internal/config"
 )
 
 const webPort = "80"
 
-type Config struct {
-}
-
 func main() {
-	app := Config{}
-	log.Println("Starting broker service on port:", webPort)
+	cfg := config.New()
 
-	// define hhtp server
+	cfg.InfoLog.Printf("Starting broker service on port %s", webPort)
+
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", webPort),
-		Handler: routes(&app),
+		Handler: api.Routes(cfg),
 	}
-	// start the server
+
 	err := srv.ListenAndServe()
 	if err != nil {
-		log.Panic(err)
+		cfg.ErrorLog.Panic(err)
 	}
 }
